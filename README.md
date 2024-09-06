@@ -11,20 +11,14 @@ First, information is collected on each article and loaded into a dataframe. In 
 
 Most major publications have public RSS feeds that contain information on each article, including the title, description, link, source, and  publication date. Here, I access RSS feeds from my favorite news sources: *The New York Times*, *The Wall Stree Journal*, and *Financial Times*. I use [feedparser](https://feedparser.readthedocs.io/en/latest/)–designed specifically for RSS feeds–and [Beautiful Soup](https://beautiful-soup-4.readthedocs.io/en/latest/) to take the relevant information out of each feed's XML format. I then combine the data from each feed into one dataframe.  
 
-Pictured below is a snippet from the RSS feed for the Technology section of *The New York Times*, and, more specifically, the first listed article: "OpenAI, Maker of ChatGPT, Is Trying to Grow Up". Note how its metadata is stored in a standardized set of tags, such as `<title>`, `<link>`, and `<description>`. This format is also standardized across publications, allowing libraries like feedparser to efficiently extract information from any RSS feed.
-
-<img src="images/nyt_rss.png" style="display: block; margin: 0 auto;"/>
+Take, for example, the RSS feed for the Technology section of *The New York Times*, and, more specifically, the first listed article: "OpenAI, Maker of ChatGPT, Is Trying to Grow Up". Its metadata is stored in a standardized set of tags, such as `<title>`, `<link>`, and `<description>`. This format is also standardized across publications, allowing libraries like feedparser to efficiently extract information from any RSS feed.
 
 
 ### 2. Feature Engineering
 
-The relevant features provided in the metadata of the RSS feeds are shown below.
-
-<img src="images/sample_df.png" style="display: block; margin: 0 auto;"/>
-
-Although *NYT* and *FT* provide data on the categories included in each article, such is not the case for *WSJ*, as seen in the third row's empty `categories` entry above. In addition to this, the set of categories are not standardized between publications and also tend to be overly specific, thus limiting their generalizablility and predictive potential for a recommendation model. 
+Although *NYT* and *FT* provide data on the categories included in each article, such is not the case for *WSJ*. In addition to this, the set of categories are not standardized between publications and also tend to be overly specific, thus limiting their generalizablility and predictive potential for a recommendation model. 
   
-Existing LLMs can be used to enrich the dataset by classifying articles based on their associated textual data. I utilize the fine-tuned BERT model [`bert-base-uncased-ag_news`](https://huggingface.co/fabriceyhc/bert-base-uncased-ag_news), which is trained on the [AG News dataset](https://huggingface.co/datasets/fancyzhx/ag_news). This takes in the concatenated `title` and `description` of an article and predicts one of four categories: `Business`, `Sci/Tech`, `Sports`, or `World`. In the sample articles above, BERT accurately assigns `Sci/Tech` to the first article about a brain study, `World` for the second article about emigration in Venezuela, and `Business` for the third article about the US electric vehicle market. This creates the new `predicted_category` variable–standardized across all publications–that can be used to make high-level distinctions between articles.
+Existing LLMs can be used to enrich the dataset by classifying articles based on their associated textual data. I utilize the fine-tuned BERT model [`bert-base-uncased-ag_news`](https://huggingface.co/fabriceyhc/bert-base-uncased-ag_news), which is trained on the [AG News dataset](https://huggingface.co/datasets/fancyzhx/ag_news). This takes in the concatenated `title` and `description` of an article and predicts one of four categories: `Business`, `Sci/Tech`, `Sports`, or `World`. For example, BERT accurately assigns `Sci/Tech` to an article about a brain study, `World` an article about emigration in Venezuela, and `Business` for one about the US electric vehicle market. This creates the new `predicted_category` variable–standardized across all publications–that can be used to make high-level distinctions between articles.
 
 Here is the code that runs inference on the BERT model to extract the new feature from an article's textual data:
 ```python
@@ -90,15 +84,11 @@ To automate the execution of this Bash script on a daily basis, I created a .pli
 
 ### 4. Labeling Article Preferences
 
-Like any model, I will need labels for the variable that I am trying to predict. In this case, I want to create a model that learns what articles interest me. I encode this variable, which we will call `label`, as a binary indicator variable such that:
-
-<img src="images/label_piecewise.png" style="display: block; margin: 0 auto;"/>
+Like any model, I will need labels for the variable that I am trying to predict. In this case, I want to create a model that learns what articles interest me. I encode this variable, which we will call `label`, as a binary indicator variable such that `label=1` if I would read it and `label=0` if I would not.
 
 The binary encoding approach is not only simpler than, say, rating each article on a scale from 1 to 10, but it also mirrors a more practical and scalable user data collection strategy. Instead of manually labeling the data as I am doing now, these `1`s and `0`s can be implicitly gathered by tracking whether or not I clicked on an article. Therefore, this method can seamlessly integrate with natural user behavior, allowing for efficient data collection without requiring the friction of active user inputs.
 
-In order to label the data, I created a script that prompts the user (i.e., me) with the title and description of each article, accepts either a `1` or `0`, then plugs this value into that article's `label` entry in the dataframe. At scale, this script would be replaced with the aforementioned tracker that records whether a user clicked on an article. The below screenshot from my command line shows the labeling function in use:  
-
-<img src="images/labeling_cli.png" style="display: block; margin: 0 auto;"/>
+In order to label the data, I created a script that prompts the user (i.e., me) with the title and description of each article, accepts either a `1` or `0`, then plugs this value into that article's `label` entry in the dataframe. At scale, this script would be replaced with the aforementioned tracker that records whether a user clicked on an article.
 
 
 ### 5. Data Exploration
@@ -107,15 +97,10 @@ Let's explore the data before jumping right into making recommendations. This wi
 
 First, I inspect the target variable, `label`, to see the raw article counts and the imbalance between the two classes. There are 856 total articles, with `label=0` for 618 of them and `label=1` for the remaining 238. There are several ways to deal with this imbalance, which will be discussed in the modeling section.
 
-<img src="images/label_distribution.png" style="display: block; margin: 0 auto;"/>
-
-Next, I break down the newspaper sources for the articles. These distributions are shown for both the entire article set and for my preferences (i.e., articles with `label=1`). The graph below suggests that I disproportionately favor *The Wall Street Journal*, which makes up around 25% of all the articles but 40% of those that I would read. *The New York Times*, on the other hand, drops in its prevalence, though still makes up nearly half of my preferences due to its high volume of articles. This makes sense because *WSJ* caters more to my interests in technology and business, whereas *NYT* covers a much wider array of topics.
-
-<img src="images/article_source.png" style="display: block; margin: 0 auto;"/>
+Next, I break down the newspaper sources for the articles. These distributions were analyzed for both the entire article set and for my preferences (i.e., articles with `label=1`). They reveal that I disproportionately favor *The Wall Street Journal*, which makes up around 25% of all the articles but 40% of those that I would read. *The New York Times*, on the other hand, drops in its prevalence, though still makes up nearly half of my preferences due to its high volume of articles. This makes sense because *WSJ* caters more to my interests in technology and business, whereas *NYT* covers a much wider array of topics.
 
 My interests are more directly reflected in the distributions of `predicted_category`, which classifies each article into one of four categories based on its title and description. `Business` and `Sci/Tech` are more represented among my preferences, whereas `Sports` and `World` are less represented.
 
-<img src="images/predicted_category.png" style="display: block; margin: 0 auto;"/>
 
 ### 6. Pre-Processing
 
@@ -161,6 +146,3 @@ Therefore, the articles are algorithmically recommended with the following steps
 4. Make Recommendations: After the articles are carefully selected based on relevance and diversity, the tool presents the final list of 15 articles to me, each accompanied by the relevant information such as the title, description, and a direct link to the full article.
 
 The specific criteria and process for selecting articles can be adjusted in a number of ways. For example, articles can be sampled according to their `preference_prob`, other variables like `source` can be considered, the number of articles can be adjusted, and the list goes on. I created the above example to demonstrate how the recommender can leverage an ML classification model that learns from a user's media consumption patterns, while also maintaining a degree of stochasticity. And, at the end of the day, the biggest improvement will come from a larger dataset, which will allow for the leveraging of more complex models like LLMs.
-
-And here are the 15 articles recommended to me by the complete recommendation algorithm!
-<img src="images/article_recs.png" style="display: block; margin: 0 auto;"/>
