@@ -1,5 +1,5 @@
 ## Personalized News Aggregator
-##### (see the code [here](/https://github.com/pappoja/news_agg))  
+##### (see the code [here](https://github.com/pappoja/news_agg))  
   
   
 **Project description:** In this project, I create a tool that saves me the time of scrolling through multiple news sources in order to find articles that interest me. I do so by building a smart news aggregator that automatically reads in the daily article feeds from my go-to newspapers and selects those that I would be most likely to read.
